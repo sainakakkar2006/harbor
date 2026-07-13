@@ -146,6 +146,19 @@ async function sendTurn(text) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ conversation_id: "demo-" + sessionId, messages }),
     });
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      const d = body.detail || {};
+      if (r.status === 503) {
+        addMsg("system", "⚠️ 503 detection_unavailable — models unreachable; the keyword screen can't clear this message, so Harbor refuses to say \"no risk\". Integrators retry or queue (fail-closed contract).");
+      } else if (r.status === 429) {
+        addMsg("system", "⚠️ 429 — demo rate limit reached (" + (d.limit_per_hour || 30) + "/hour per IP). Production traffic uses an API key.");
+      } else {
+        addMsg("system", "API error " + r.status);
+      }
+      document.getElementById("send").disabled = false;
+      return;
+    }
     const a = await r.json();
     render(a);
     if (a.referral_issued) {
@@ -178,7 +191,7 @@ function render(a) {
       <dt>Referral issued / escalation</dt>
       <dd>${a.referral_issued ? "✅ yes" : "—"} / ${a.escalation_triggered ? "🔔 webhook fired" : "—"}</dd>
       ${resources ? "<dt>Crisis resources returned</dt><dd>" + resources + "</dd>" : ""}
-      <dt>Latency · model</dt><dd>${a.latency_ms} ms · ${a.model}</dd>
+      <dt>Latency · engine</dt><dd>${a.latency_ms} ms · ${a.model}${a.degraded ? " · ⚠️ degraded (keyword screen, not a model)" : ""}</dd>
     </dl>
     <div class="raw">${JSON.stringify({risk_level: a.risk_level, recommended_action: a.recommended_action, referral_issued: a.referral_issued}, null, 1)}</div>`;
 }

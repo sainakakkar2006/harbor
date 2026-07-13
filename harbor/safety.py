@@ -3,17 +3,27 @@
 Taxonomy is deliberately narrow: this classifies *user distress signals that
 trigger a duty-of-care response* (SB 243 crisis protocol), not general content
 moderation. Precision on imminent-risk matters more than breadth.
+
+Degradation contract (see README): the primary model is tried first, then a
+backup model. If both fail, the keyword screen runs and the result is marked
+degraded=True with model="fallback_keyword_v2" — the response never claims a
+Gemini model assessed a message it didn't. Whether a degraded no-risk result
+becomes a 503 is the API layer's decision (HARBOR_FAIL_MODE).
 """
 
 import json
 import os
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from pydantic import BaseModel
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
+GEMINI_BACKUP_MODEL = os.environ.get("GEMINI_BACKUP_MODEL", "gemini-flash-lite-latest")
+GEMINI_TIMEOUT_MS = int(os.environ.get("GEMINI_TIMEOUT_MS", "8000"))
+
+FALLBACK_ENGINE = "fallback_keyword_v2"
 
 RISK_LEVELS = ["none", "low", "moderate", "high", "imminent"]
 
@@ -44,6 +54,12 @@ CRISIS_RESOURCES = {
     "GB": [
         {"name": "Samaritans", "contact": "Call 116 123", "url": "https://www.samaritans.org"},
     ],
+    "MX": [
+        {"name": "Línea de la Vida", "contact": "800 911 2000", "url": "https://www.gob.mx/salud/conadic"},
+    ],
+    "ES": [
+        {"name": "Teléfono de la Esperanza / Línea 024", "contact": "Llama al 024", "url": "https://www.sanidad.gob.es/linea024/home.htm"},
+    ],
     "DEFAULT": [
         {"name": "International Association for Suicide Prevention — Crisis Centres", "contact": "", "url": "https://www.iasp.info/resources/Crisis_Centres/"},
     ],
@@ -57,7 +73,7 @@ class Assessment(BaseModel):
     confidence: float  # 0–1
 
 
-_SYSTEM = f"""You are a safety classifier for an AI chat application. You assess the USER's messages (not the assistant's) for signals that require a duty-of-care response under California SB 243 and similar laws.
+_SYSTEM = f"""You are a safety classifier for an AI chat application. You assess the USER's messages (not the assistant's) for signals that require a duty-of-care response under California SB 243 and similar laws. Users may write in any language — assess meaning, not language.
 
 Risk levels (pick exactly one):
 - none: no distress signals
@@ -70,7 +86,8 @@ Categories (pick all that apply, may be empty): {", ".join(CATEGORIES)}
 
 Rules:
 - Judge the whole conversation trajectory, weighting recent messages most.
-- Indirect and masked expressions count ("I won't be a problem much longer").
+- Indirect and masked expressions count ("I won't be a problem much longer"), as do
+  abbreviations and euphemisms in any language ("kms", "unalive").
 - Do NOT flag: idioms ("this traffic is killing me"), fiction/roleplay clearly framed as such, academic discussion of these topics, song lyrics.
 - rationale: one sentence, describe the signal type — never quote the user's words back.
 - When genuinely uncertain between two levels, pick the higher one.
@@ -78,16 +95,35 @@ Rules:
 
 
 def assess(messages: List[Dict[str, str]], user_locale: str = "US") -> Dict:
-    """Assess a conversation. Returns assessment dict + resources + recommended action."""
+    """Assess a conversation.
+
+    Returns the assessment plus resources, recommended action, and an honest
+    account of which engine produced it:
+      model     — engine that actually ran (never a Gemini name unless Gemini ran)
+      degraded  — True when the keyword screen answered instead of a model
+      degraded_reason — "model_error" (key set, calls failed) or
+                        "no_model_configured" (no GEMINI_API_KEY)
+    """
+    result = None
+    model_used = None
+    degraded_reason = None
+
     if GEMINI_API_KEY:
-        try:
-            result = _gemini_assess(messages)
-        except Exception:
-            # Rate limit / outage must degrade to the over-sensitive keyword
-            # fallback, never surface an error: fail open on safety, not closed.
+        for model in (GEMINI_MODEL, GEMINI_BACKUP_MODEL):
+            try:
+                result = _gemini_assess(messages, model)
+                model_used = model
+                break
+            except Exception:
+                continue
+        if result is None:
             result = _fallback_assess(messages)
+            model_used = FALLBACK_ENGINE
+            degraded_reason = "model_error"
     else:
         result = _fallback_assess(messages)
+        model_used = FALLBACK_ENGINE
+        degraded_reason = "no_model_configured"
 
     level = result.risk_level if result.risk_level in RISK_LEVELS else "high"
     referral = level in ("moderate", "high", "imminent")
@@ -99,19 +135,24 @@ def assess(messages: List[Dict[str, str]], user_locale: str = "US") -> Dict:
         "recommended_action": ACTIONS[level],
         "referral_issued": referral,
         "crisis_resources": CRISIS_RESOURCES.get(user_locale, CRISIS_RESOURCES["DEFAULT"]) if referral else [],
-        "model": GEMINI_MODEL if GEMINI_API_KEY else "fallback_keyword",
+        "model": model_used,
+        "degraded": degraded_reason is not None,
+        "degraded_reason": degraded_reason,
     }
 
 
-def _gemini_assess(messages: List[Dict[str, str]]) -> Assessment:
+def _gemini_assess(messages: List[Dict[str, str]], model: str) -> Assessment:
     from google import genai
     from google.genai import types
 
-    client = genai.Client(api_key=GEMINI_API_KEY)
+    client = genai.Client(
+        api_key=GEMINI_API_KEY,
+        http_options=types.HttpOptions(timeout=GEMINI_TIMEOUT_MS),
+    )
     convo = "\n".join(f"{m['role'].upper()}: {m['content']}" for m in messages[-20:])
 
     resp = client.models.generate_content(
-        model=GEMINI_MODEL,
+        model=model,
         contents=f"CONVERSATION:\n{convo}\n\nAssess the user's current risk.",
         config=types.GenerateContentConfig(
             system_instruction=_SYSTEM,
@@ -123,27 +164,53 @@ def _gemini_assess(messages: List[Dict[str, str]]) -> Assessment:
     return Assessment(**json.loads(resp.text))
 
 
-# Deliberately over-sensitive keyword fallback: only used when Gemini is
-# unreachable, where a false positive (showing resources) is the safe failure.
-_IMMINENT_RE = re.compile(
-    r"\b(kill myself|end my life|suicide|want to die|better off dead|"
-    r"hurt myself|cutting myself|no reason to live)\b",
+# ---------------------------------------------------------------------------
+# Degraded keyword screen (v2). This is a safety net, not a classifier: it is
+# deliberately over-sensitive, covers common abbreviations/euphemisms, Spanish,
+# and means+finality phrasing. It exists so an outage degrades to "too careful"
+# instead of "silent none" — the API layer still surfaces degraded=True and,
+# for no-risk results, fails closed by default.
+# ---------------------------------------------------------------------------
+
+_EXPLICIT_RE = re.compile(
+    r"\b("
+    # English — explicit and common shorthand
+    r"kill(ing)? myself|kms|unalive( myself)?|suicid(e|al)|end(ing)? my life|"
+    r"end it all|take my own life|want(s|ed)? to die|wanna die|"
+    r"wish i (was|were) dead|better off dead|no reason to live|"
+    r"(don'?t|do not) want to (live|be alive|wake up)|tired of being alive|"
+    r"hurt(ing)? myself|cut(ting)? myself|self.?harm|"
+    r"won'?t be (around|a problem|here) (much longer|anymore)|"
+    r"not be here tomorrow|goodbye forever|"
+    # Spanish — explicit
+    r"quitar(me|se) la vida|no quiero (vivir|seguir viviendo)|"
+    r"matar(me|se)|suicidar(me|se)|acabar con mi vida|quiero morir(me)?"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# Means + finality within one message ("I have a gun and I'm done",
+# "the rope is tied and I'm stepping off the chair now").
+_MEANS = r"(gun|rope|pills?|bridge|blade|razor|knife|ledge|roof|pistola|cuerda|pastillas)"
+_FINALITY = r"(i'?m done|done|end(ing)? (it|this)|ready|tonight|right now|goodbye|step(ping)? off|jump(ing)?|going to (do it|end)|se acab[oó]|esta noche)"
+_MEANS_INTENT_RE = re.compile(
+    rf"\b{_MEANS}\b.{{0,80}}\b{_FINALITY}\b|\b{_FINALITY}\b.{{0,80}}\b{_MEANS}\b",
     re.IGNORECASE,
 )
 
 
 def _fallback_assess(messages: List[Dict[str, str]]) -> Assessment:
     user_text = " ".join(m["content"] for m in messages if m.get("role") == "user")
-    if _IMMINENT_RE.search(user_text):
+    if _EXPLICIT_RE.search(user_text) or _MEANS_INTENT_RE.search(user_text):
         return Assessment(
             risk_level="high",
             categories=["suicidal_ideation"],
-            rationale="Keyword fallback matched explicit risk language (Gemini unavailable).",
-            confidence=0.5,
+            rationale="Degraded keyword screen matched risk language; full-model assessment unavailable.",
+            confidence=0.45,
         )
     return Assessment(
         risk_level="none",
         categories=[],
-        rationale="Keyword fallback found no explicit risk language (Gemini unavailable).",
-        confidence=0.3,
+        rationale="Degraded keyword screen found no risk language; full-model assessment unavailable.",
+        confidence=0.2,
     )

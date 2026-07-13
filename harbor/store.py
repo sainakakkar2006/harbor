@@ -62,31 +62,48 @@ def log_event(conversation_id: str, assessment: Dict, api_key_label: str, latenc
     conn.close()
 
 
-def stats(days: int = 14) -> Dict:
-    """Operational stats for the dashboard (last N days)."""
+def monthly_count(label: str) -> int:
+    """Assessments this calendar month for one tenant (metering)."""
+    now = time.localtime()
+    start = time.mktime((now.tm_year, now.tm_mon, 1, 0, 0, 0, 0, 0, -1))
+    conn = _conn()
+    (n,) = conn.execute(
+        "SELECT COUNT(*) FROM events WHERE api_key_label = ? AND ts >= ?", (label, start)
+    ).fetchone()
+    conn.close()
+    return n
+
+
+def stats(days: int = 14, label: str = None) -> Dict:
+    """Operational stats for the dashboard (last N days), scoped to one tenant."""
     since = time.time() - days * 86400
+    where, params = "ts >= ?", [since]
+    if label is not None:
+        where += " AND api_key_label = ?"
+        params.append(label)
     conn = _conn()
     total, referrals, avg_latency = conn.execute(
-        "SELECT COUNT(*), COALESCE(SUM(referral_issued),0), COALESCE(AVG(latency_ms),0) "
-        "FROM events WHERE ts >= ?",
-        (since,),
+        f"SELECT COUNT(*), COALESCE(SUM(referral_issued),0), COALESCE(AVG(latency_ms),0) "
+        f"FROM events WHERE {where}",
+        params,
     ).fetchone()
     by_level = dict(
         conn.execute(
-            "SELECT risk_level, COUNT(*) FROM events WHERE ts >= ? GROUP BY risk_level",
-            (since,),
+            f"SELECT risk_level, COUNT(*) FROM events WHERE {where} GROUP BY risk_level",
+            params,
         ).fetchall()
     )
     daily = [
         {"date": d, "assessments": n, "referrals": r}
         for d, n, r in conn.execute(
-            "SELECT date(ts, 'unixepoch'), COUNT(*), SUM(referral_issued) "
-            "FROM events WHERE ts >= ? GROUP BY 1 ORDER BY 1",
-            (since,),
+            f"SELECT date(ts, 'unixepoch'), COUNT(*), SUM(referral_issued) "
+            f"FROM events WHERE {where} GROUP BY 1 ORDER BY 1",
+            params,
         ).fetchall()
     ]
     conn.close()
     return {
+        "tenant": label or "all",
         "window_days": days,
         "total_assessments": total,
         "referrals_issued": referrals,
@@ -96,24 +113,28 @@ def stats(days: int = 14) -> Dict:
     }
 
 
-def compliance_report(year: int) -> Dict:
-    """Aggregates shaped to SB 243 §22603's annual reporting fields."""
+def compliance_report(year: int, label: str = None) -> Dict:
+    """Aggregates shaped to SB 243 §22603's annual reporting fields, per tenant."""
     start = time.mktime((year, 1, 1, 0, 0, 0, 0, 0, -1))
     end = time.mktime((year + 1, 1, 1, 0, 0, 0, 0, 0, -1))
+    where, params = "ts >= ? AND ts < ?", [start, end]
+    if label is not None:
+        where += " AND api_key_label = ?"
+        params.append(label)
     conn = _conn()
     cur = conn.execute(
-        "SELECT COUNT(*), SUM(referral_issued) FROM events WHERE ts >= ? AND ts < ?",
-        (start, end),
+        f"SELECT COUNT(*), SUM(referral_issued) FROM events WHERE {where}", params
     )
     total, referrals = cur.fetchone()
     by_level = dict(
         conn.execute(
-            "SELECT risk_level, COUNT(*) FROM events WHERE ts >= ? AND ts < ? GROUP BY risk_level",
-            (start, end),
+            f"SELECT risk_level, COUNT(*) FROM events WHERE {where} GROUP BY risk_level",
+            params,
         ).fetchall()
     )
     conn.close()
     return {
+        "tenant": label or "all",
         "year": year,
         "total_assessments": total or 0,
         "crisis_referral_notifications_issued": referrals or 0,
