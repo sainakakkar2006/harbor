@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harbor — Live demo</title>
+<style>
+  :root {
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e;
+    --muted: #898781; --line: #e1e0d9; --border: rgba(11,11,11,0.10);
+    --accent: #2a78d6; --accent-ink: #fff; --code-bg: #f0efec;
+    --lvl-none: #898781; --lvl-low: #0ca30c; --lvl-moderate: #fab219;
+    --lvl-high: #ec835a; --lvl-imminent: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #fff; --ink-2: #c3c2b7;
+      --line: #2c2c2a; --border: rgba(255,255,255,0.10);
+      --accent: #3987e5; --code-bg: #232322;
+    }
+  }
+  * { margin: 0; box-sizing: border-box; }
+  body { background: var(--page); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 20px 40px; }
+  nav { display: flex; justify-content: space-between; align-items: center; padding: 18px 0; }
+  .logo { font-weight: 700; font-size: 18px; text-decoration: none; color: var(--ink); }
+  .logo span { color: var(--accent); }
+  nav a { color: var(--ink-2); text-decoration: none; margin-left: 20px; font-size: 14px; }
+  h1 { font-size: 24px; letter-spacing: -0.02em; margin-bottom: 4px; }
+  .sub { color: var(--ink-2); margin-bottom: 18px; }
+  .scenarios { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .scenarios button { border: 1px solid var(--border); background: var(--surface); color: var(--ink-2);
+    border-radius: 999px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+  .scenarios button:hover { border-color: var(--accent); color: var(--ink); }
+  .cols { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; }
+  @media (max-width: 800px) { .cols { grid-template-columns: 1fr; } }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; min-height: 480px; }
+  .panel h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
+    padding: 14px 16px; border-bottom: 1px solid var(--line); font-weight: 600; }
+  #chat { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 82%; padding: 9px 13px; border-radius: 12px; font-size: 14.5px; }
+  .msg.user { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 4px; }
+  .msg.assistant { align-self: flex-start; background: var(--code-bg); border-bottom-left-radius: 4px; }
+  .msg.system { align-self: center; background: none; color: var(--muted); font-size: 12.5px; text-align: center; }
+  form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+  input[type=text] { flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--page); color: var(--ink); font-size: 14.5px; }
+  form button { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px;
+    padding: 10px 18px; font-weight: 600; font-size: 14.5px; cursor: pointer; }
+  form button:disabled { opacity: 0.5; }
+  .assess-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .meter { display: flex; gap: 4px; }
+  .meter div { flex: 1; text-align: center; padding: 8px 2px; border-radius: 6px; font-size: 11.5px;
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+    background: var(--code-bg); color: var(--muted); border: 2px solid transparent; }
+  .meter div.active-none      { border-color: var(--lvl-none);      color: var(--ink); }
+  .meter div.active-low       { border-color: var(--lvl-low);       color: var(--ink); }
+  .meter div.active-moderate  { border-color: var(--lvl-moderate);  color: var(--ink); }
+  .meter div.active-high      { border-color: var(--lvl-high);      color: var(--ink); }
+  .meter div.active-imminent  { border-color: var(--lvl-imminent);  color: var(--ink); background: color-mix(in srgb, var(--lvl-imminent) 14%, var(--surface)); }
+  .kv { font-size: 14px; }
+  .kv dt { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 10px; }
+  .kv dd { margin: 2px 0 0; }
+  .resource { border: 1px solid var(--border); border-left: 3px solid var(--lvl-imminent);
+    border-radius: 8px; padding: 10px 12px; margin-top: 6px; font-size: 14px; }
+  .resource b { display: block; }
+  .resource span { color: var(--ink-2); }
+  .pill { display: inline-block; background: var(--code-bg); border-radius: 999px; padding: 2px 10px;
+    font-size: 12.5px; color: var(--ink-2); margin: 2px 4px 0 0; }
+  .empty { color: var(--muted); text-align: center; margin: auto; padding: 30px; }
+  .raw { font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; background: var(--code-bg);
+    border-radius: 8px; padding: 10px; overflow-x: auto; white-space: pre; color: var(--ink-2); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="logo" href="/">⚓ Harbor<span>.</span></a>
+    <div><a href="/docs">API docs</a><a href="/dashboard">Dashboard</a></div>
+  </nav>
+  <h1>Live demo</h1>
+  <p class="sub">Chat on the left as if you were a user of any AI companion app. Every turn is sent to
+  <code>POST /v1/assess</code> — the panel on the right is Harbor's real-time response.</p>
+
+  <div class="scenarios">
+    <button data-s="benign">😊 Benign chat</button>
+    <button data-s="idiom">🙃 Idiom trap ("killing me")</button>
+    <button data-s="masked">😶 Masked ideation</button>
+    <button data-s="crisis">🚨 Explicit crisis</button>
+    <button id="reset">↺ Reset</button>
+  </div>
+
+  <div class="cols">
+    <div class="panel">
+      <h3>Companion app (simulated)</h3>
+      <div id="chat"><div class="msg system">Start typing, or pick a scenario above.</div></div>
+      <form id="f">
+        <input type="text" id="inp" placeholder="Say something as the user…" autocomplete="off">
+        <button id="send">Send</button>
+      </form>
+    </div>
+    <div class="panel">
+      <h3>Harbor assessment — live</h3>
+      <div class="assess-body" id="assess"><div class="empty">No assessment yet.</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const LEVELS = ["none", "low", "moderate", "high", "imminent"];
+const SCENARIOS = {
+  benign: ["hey! just got back from the beach, what a day"],
+  idiom:  ["ugh this calculus homework is literally killing me lol"],
+  masked: ["everyone would be happier without me around", "i won't be a problem much longer anyway"],
+  crisis: ["i can't do this anymore. i want to kill myself"],
+};
+const CANNED = "I hear you. I'm here to chat — tell me more?";
+let messages = [];
+const chat = document.getElementById("chat");
+const assessEl = document.getElementById("assess");
+const inp = document.getElementById("inp");
+
+function addMsg(role, text) {
+  const d = document.createElement("div");
+  d.className = "msg " + role;
+  d.textContent = text;
+  chat.appendChild(d);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+async function sendTurn(text) {
+  messages.push({ role: "user", content: text });
+  addMsg("user", text);
+  document.getElementById("send").disabled = true;
+  try {
+    const r = await fetch("/v1/assess", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversation_id: "demo-" + sessionId, messages }),
+    });
+    const a = await r.json();
+    render(a);
+    if (a.referral_issued) {
+      const res = a.crisis_resources[0];
+      addMsg("system", "⚓ Harbor interrupted the reply and surfaced: " + (res ? res.name + " — " + res.contact : "crisis resources"));
+    } else {
+      addMsg("assistant", CANNED);
+      messages.push({ role: "assistant", content: CANNED });
+    }
+  } catch (e) {
+    addMsg("system", "API error: " + e.message);
+  }
+  document.getElementById("send").disabled = false;
+}
+
+function render(a) {
+  const meter = LEVELS.map(l =>
+    `<div class="${l === a.risk_level ? "active-" + l : ""}">${l}</div>`).join("");
+  const cats = a.categories.length
+    ? a.categories.map(c => `<span class="pill">${c.replaceAll("_", " ")}</span>`).join("")
+    : '<span class="pill">none</span>';
+  const resources = a.crisis_resources.map(r =>
+    `<div class="resource"><b>${r.name}</b><span>${r.contact}</span></div>`).join("");
+  assessEl.innerHTML = `
+    <div class="meter">${meter}</div>
+    <dl class="kv">
+      <dt>Recommended action</dt><dd><b>${a.recommended_action.replaceAll("_", " ")}</b></dd>
+      <dt>Categories</dt><dd>${cats}</dd>
+      <dt>Rationale</dt><dd>${a.rationale}</dd>
+      <dt>Referral issued / escalation</dt>
+      <dd>${a.referral_issued ? "✅ yes" : "—"} / ${a.escalation_triggered ? "🔔 webhook fired" : "—"}</dd>
+      ${resources ? "<dt>Crisis resources returned</dt><dd>" + resources + "</dd>" : ""}
+      <dt>Latency · model</dt><dd>${a.latency_ms} ms · ${a.model}</dd>
+    </dl>
+    <div class="raw">${JSON.stringify({risk_level: a.risk_level, recommended_action: a.recommended_action, referral_issued: a.referral_issued}, null, 1)}</div>`;
+}
+
+let sessionId = Math.random().toString(36).slice(2, 8);
+document.getElementById("f").addEventListener("submit", e => {
+  e.preventDefault();
+  const t = inp.value.trim();
+  if (t) { inp.value = ""; sendTurn(t); }
+});
+function reset(note) {
+  messages = [];
+  sessionId = Math.random().toString(36).slice(2, 8);
+  chat.innerHTML = `<div class="msg system">${note}</div>`;
+  assessEl.innerHTML = '<div class="empty">No assessment yet.</div>';
+}
+document.querySelectorAll(".scenarios button[data-s]").forEach(b =>
+  b.addEventListener("click", async () => {
+    reset("Scenario: " + b.textContent.trim() + " (fresh conversation)");
+    for (const line of SCENARIOS[b.dataset.s]) await sendTurn(line);
+  }));
+document.getElementById("reset").addEventListener("click", () => reset("Conversation reset."));
+</script>
+</body>
+</html>

@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harbor — Compliance dashboard</title>
+<style>
+  :root {
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e;
+    --muted: #898781; --line: #e1e0d9; --border: rgba(11,11,11,0.10);
+    --accent: #2a78d6; --grid: #e1e0d9; --baseline: #c3c2b7; --code-bg: #f0efec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #fff; --ink-2: #c3c2b7;
+      --line: #2c2c2a; --border: rgba(255,255,255,0.10);
+      --accent: #3987e5; --grid: #2c2c2a; --baseline: #383835; --code-bg: #232322;
+    }
+  }
+  * { margin: 0; box-sizing: border-box; }
+  body { background: var(--page); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 20px 48px; }
+  nav { display: flex; justify-content: space-between; align-items: center; padding: 18px 0; }
+  .logo { font-weight: 700; font-size: 18px; text-decoration: none; color: var(--ink); }
+  .logo span { color: var(--accent); }
+  nav a { color: var(--ink-2); text-decoration: none; margin-left: 20px; font-size: 14px; }
+  h1 { font-size: 24px; letter-spacing: -0.02em; }
+  .sub { color: var(--ink-2); margin: 4px 0 20px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 16px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+  .tile .label { color: var(--muted); font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .tile .value { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; margin-top: 2px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .panel h3 { font-size: 15px; margin-bottom: 2px; }
+  .panel .note { color: var(--muted); font-size: 12.5px; margin-bottom: 14px; }
+  .chart { display: flex; align-items: flex-end; gap: 6px; height: 150px; border-bottom: 1px solid var(--baseline); position: relative; }
+  .bar { flex: 1; min-width: 10px; max-width: 72px; background: var(--accent); border-radius: 4px 4px 0 0; position: relative; cursor: default; }
+  .bar:hover { opacity: 0.85; }
+  .bar .tip { display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: var(--page); font-size: 12px; padding: 5px 9px; border-radius: 6px;
+    white-space: nowrap; margin-bottom: 6px; z-index: 2; }
+  .bar:hover .tip { display: block; }
+  .xlabels { display: flex; gap: 6px; margin-top: 6px; }
+  .xlabels div { flex: 1; max-width: 72px; text-align: center; font-size: 11px; color: var(--muted); overflow: hidden; }
+  .hbar-row { display: grid; grid-template-columns: 90px 1fr 46px; align-items: center; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .hbar-row .name { color: var(--ink-2); text-transform: capitalize; }
+  .hbar-track { height: 18px; }
+  .hbar { height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; min-width: 2px; }
+  .hbar-row .n { text-align: right; font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+  .protocol { font-size: 13.5px; color: var(--ink-2); background: var(--code-bg); border-radius: 8px; padding: 12px 14px; }
+  .empty { color: var(--muted); padding: 30px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="logo" href="/">⚓ Harbor<span>.</span></a>
+    <div><a href="/docs">API docs</a><a href="/demo">Live demo</a></div>
+  </nav>
+  <h1>Compliance dashboard</h1>
+  <p class="sub">Last 14 days of production assessments. No message content or user identifiers are ever stored.</p>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="panel">
+    <h3>Assessments per day</h3>
+    <div class="note">Hover a bar for referral counts.</div>
+    <div id="daily"></div>
+  </div>
+
+  <div class="panel">
+    <h3>Assessments by risk level</h3>
+    <div class="note">Counts across the window, ordered by severity.</div>
+    <div id="levels"></div>
+  </div>
+
+  <div class="panel">
+    <h3>SB 243 annual report preview (2026)</h3>
+    <div class="note">The exact aggregates §22603 asks for — exportable, PII-free.</div>
+    <div id="report"></div>
+  </div>
+</div>
+
+<script>
+const LEVELS = ["none", "low", "moderate", "high", "imminent"];
+
+async function load() {
+  const [stats, report] = await Promise.all([
+    fetch("/v1/stats?days=14").then(r => r.json()),
+    fetch("/v1/compliance/report?year=2026").then(r => r.json()),
+  ]);
+
+  document.getElementById("tiles").innerHTML = [
+    ["Assessments (14d)", stats.total_assessments],
+    ["Crisis referrals issued", stats.referrals_issued],
+    ["Avg latency", stats.avg_latency_ms + " ms"],
+    ["High / imminent events", (stats.by_risk_level.high || 0) + (stats.by_risk_level.imminent || 0)],
+  ].map(([l, v]) => `<div class="tile"><div class="label">${l}</div><div class="value">${v}</div></div>`).join("");
+
+  const daily = stats.daily;
+  if (!daily.length) {
+    document.getElementById("daily").innerHTML = '<div class="empty">No events yet — send traffic to /v1/assess or try the <a href="/demo">demo</a>.</div>';
+  } else {
+    const max = Math.max(...daily.map(d => d.assessments));
+    document.getElementById("daily").innerHTML =
+      '<div class="chart">' + daily.map(d =>
+        `<div class="bar" style="height:${Math.max(4, d.assessments / max * 100)}%">
+           <div class="tip">${d.date} — ${d.assessments} assessed, ${d.referrals || 0} referred</div>
+         </div>`).join("") + "</div>" +
+      '<div class="xlabels">' + daily.map(d => `<div>${d.date.slice(5)}</div>`).join("") + "</div>";
+  }
+
+  const byLevel = stats.by_risk_level;
+  const lmax = Math.max(1, ...LEVELS.map(l => byLevel[l] || 0));
+  document.getElementById("levels").innerHTML = LEVELS.map(l => {
+    const n = byLevel[l] || 0;
+    return `<div class="hbar-row"><div class="name">${l}</div>
+      <div class="hbar-track"><div class="hbar" style="width:${n / lmax * 100}%"></div></div>
+      <div class="n">${n}</div></div>`;
+  }).join("");
+
+  document.getElementById("report").innerHTML = `
+    <table>
+      <tr><th>Field</th><th>Value</th></tr>
+      <tr><td>Total assessments</td><td>${report.total_assessments}</td></tr>
+      <tr><td>Crisis service referral notifications issued</td><td>${report.crisis_referral_notifications_issued}</td></tr>
+    </table>
+    <p style="margin:12px 0 6px; font-size:12.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em">Published detection protocol</p>
+    <div class="protocol">${report.detection_protocol}</div>`;
+}
+load();
+</script>
+</body>
+</html>
