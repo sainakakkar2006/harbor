@@ -4,21 +4,29 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Harbor — Compliance dashboard</title>
+<meta name="description" content="Live compliance evidence: assessments, crisis referrals, and the SB 243 annual report preview.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚓</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;650;800&display=swap" rel="stylesheet">
 <style>
   :root {
     --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e;
-    --muted: #898781; --line: #e1e0d9; --border: rgba(11,11,11,0.10);
+    --muted: #6e6d67; --line: #e1e0d9; --border: rgba(11,11,11,0.10);
     --accent: #2a78d6; --grid: #e1e0d9; --baseline: #c3c2b7; --code-bg: #f0efec;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --page: #0d0d0d; --surface: #1a1a19; --ink: #fff; --ink-2: #c3c2b7;
-      --line: #2c2c2a; --border: rgba(255,255,255,0.10);
+      --muted: #9d9c95; --line: #2c2c2a; --border: rgba(255,255,255,0.10);
       --accent: #3987e5; --grid: #2c2c2a; --baseline: #383835; --code-bg: #232322;
     }
   }
   * { margin: 0; box-sizing: border-box; }
-  body { background: var(--page); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { background: var(--page); color: var(--ink); font: 400 15px/1.55 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .logo { font-weight: 800; }
+  .tile .value, .n, td { font-variant-numeric: tabular-nums; }
   .wrap { max-width: 960px; margin: 0 auto; padding: 0 20px 48px; }
   nav { display: flex; justify-content: space-between; align-items: center; padding: 18px 0; }
   .logo { font-weight: 700; font-size: 18px; text-decoration: none; color: var(--ink); }

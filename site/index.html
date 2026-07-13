@@ -3,112 +3,184 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Harbor — Safety & compliance layer for AI chat apps</title>
+<title>Harbor — SB 243 compliance & crisis safety for AI chat apps</title>
+<meta name="description" content="Drop-in API that detects user crisis signals, refers to 988 and other services, and keeps the audit trail California SB 243 requires. One API call per user turn.">
+<meta property="og:title" content="Harbor — your chatbot is now legally required to catch a crisis">
+<meta property="og:description" content="SB 243-ready crisis detection, referral, and compliance evidence for AI companion apps. $49 audit · $29/mo API.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#1c5cab">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚓</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;650;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e;
-    --muted: #898781; --line: #e1e0d9; --border: rgba(11,11,11,0.10);
-    --accent: #2a78d6; --accent-ink: #ffffff; --critical: #d03b3b;
-    --code-bg: #f0efec;
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #494846;
+    --muted: #6e6d67; --line: #e1e0d9; --border: rgba(11,11,11,0.10);
+    --accent: #1c5cab; --accent-hover: #164a8a; --accent-ink: #ffffff;
+    --accent-soft: rgba(42,120,214,0.09); --critical: #b53232; --code-bg: #f0efec;
+    --shadow: 0 1px 2px rgba(11,11,11,0.04), 0 8px 24px -12px rgba(11,11,11,0.12);
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7;
-      --muted: #898781; --line: #2c2c2a; --border: rgba(255,255,255,0.10);
-      --accent: #3987e5; --critical: #e66767; --code-bg: #232322;
+      --muted: #9d9c95; --line: #2c2c2a; --border: rgba(255,255,255,0.12);
+      --accent: #3987e5; --accent-hover: #5598e7; --accent-soft: rgba(57,135,229,0.14);
+      --critical: #e66767; --code-bg: #232322; --shadow: none;
     }
   }
   * { margin: 0; box-sizing: border-box; }
-  body { background: var(--page); color: var(--ink); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  .wrap { max-width: 860px; margin: 0 auto; padding: 0 24px; }
-  nav { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; }
-  .logo { font-weight: 700; font-size: 20px; letter-spacing: -0.02em; }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+  body {
+    background: var(--page); color: var(--ink);
+    font: 400 16.5px/1.6 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+  .navbar { position: sticky; top: 0; z-index: 10; background: var(--page); border-bottom: 1px solid var(--line); }
+  nav { display: flex; justify-content: space-between; align-items: center; height: 60px; }
+  .logo { font-weight: 800; font-size: 19px; letter-spacing: -0.02em; color: var(--ink); text-decoration: none; }
   .logo span { color: var(--accent); }
-  nav .links a { color: var(--ink-2); text-decoration: none; margin-left: 24px; font-size: 15px; }
-  nav .links a.cta { color: var(--accent); font-weight: 600; }
-  header { padding: 72px 0 56px; }
-  h1 { font-size: clamp(32px, 5vw, 46px); line-height: 1.15; letter-spacing: -0.03em; max-width: 17em; }
-  .sub { color: var(--ink-2); font-size: 19px; margin: 20px 0 32px; max-width: 34em; }
-  .btn { display: inline-block; padding: 12px 22px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; }
+  nav .links { display: flex; align-items: center; gap: 8px; }
+  nav .links a { color: var(--ink-2); text-decoration: none; font-size: 15px; font-weight: 500;
+    padding: 7px 12px; border-radius: 8px; transition: background 0.15s, color 0.15s; }
+  nav .links a:hover { background: var(--code-bg); color: var(--ink); }
+  nav .links a.cta { background: var(--accent); color: var(--accent-ink); font-weight: 650; }
+  nav .links a.cta:hover { background: var(--accent-hover); color: var(--accent-ink); }
+  @media (max-width: 560px) { nav .links a:not(.cta) { display: none; } }
+
+  header { padding: 88px 0 64px; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; background: var(--accent-soft);
+    color: var(--accent); font-size: 13.5px; font-weight: 650; letter-spacing: 0.01em;
+    padding: 6px 14px; border-radius: 999px; margin-bottom: 22px; }
+  h1 { font-size: clamp(34px, 5.4vw, 52px); font-weight: 800; line-height: 1.08;
+    letter-spacing: -0.035em; max-width: 15em; text-wrap: balance; }
+  .sub { color: var(--ink-2); font-size: 19px; line-height: 1.55; margin: 22px 0 34px; max-width: 32em; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 13px 24px; border-radius: 10px;
+    text-decoration: none; font-weight: 650; font-size: 16px; transition: background 0.15s, transform 0.15s, border-color 0.15s; }
+  .btn:active { transform: scale(0.98); }
   .btn-primary { background: var(--accent); color: var(--accent-ink); }
-  .btn-ghost { color: var(--ink); border: 1px solid var(--border); margin-left: 12px; }
-  section { padding: 48px 0; border-top: 1px solid var(--line); }
-  h2 { font-size: 26px; letter-spacing: -0.02em; margin-bottom: 8px; }
-  .lede { color: var(--ink-2); margin-bottom: 28px; max-width: 40em; }
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
-  .card b { display: block; margin-bottom: 6px; font-size: 16px; }
-  .card p { color: var(--ink-2); font-size: 14.5px; }
-  .stat { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
-  .stat + p { margin-top: 4px; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-ghost { color: var(--ink); border: 1px solid var(--border); margin-left: 10px; }
+  .btn-ghost:hover { border-color: var(--ink-2); background: var(--surface); }
+  .hero-proof { margin-top: 30px; color: var(--muted); font-size: 14px; display: flex; gap: 20px; flex-wrap: wrap; }
+  .hero-proof span { display: inline-flex; align-items: center; gap: 6px; }
+
+  section { padding: 64px 0; border-top: 1px solid var(--line); }
+  .kicker { color: var(--accent); font-size: 13px; font-weight: 650; text-transform: uppercase;
+    letter-spacing: 0.09em; margin-bottom: 10px; }
+  h2 { font-size: clamp(24px, 3.4vw, 31px); font-weight: 800; letter-spacing: -0.025em;
+    line-height: 1.2; margin-bottom: 10px; text-wrap: balance; }
+  .lede { color: var(--ink-2); margin-bottom: 32px; max-width: 36em; line-height: 1.6; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 24px; box-shadow: var(--shadow); transition: transform 0.18s, border-color 0.18s; }
+  .card:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .card .ico { font-size: 22px; margin-bottom: 10px; display: block; }
+  .card b { display: block; margin-bottom: 6px; font-size: 16px; font-weight: 650; }
+  .card p { color: var(--ink-2); font-size: 14.5px; line-height: 1.55; }
+  .stat { font-size: 34px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .stat + p { margin-top: 6px; }
   .crit { color: var(--critical); }
-  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 12px; padding: 18px; overflow-x: auto; font-size: 13.5px; line-height: 1.55; }
+
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px 22px; overflow-x: auto; font-size: 13.5px; line-height: 1.6; }
   code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .price-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
-  .price { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
-  .price .amt { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; }
-  .price .amt small { font-size: 15px; font-weight: 400; color: var(--muted); }
-  .price ul { margin: 14px 0 0; padding-left: 18px; color: var(--ink-2); font-size: 14.5px; }
-  .price li { margin: 5px 0; }
-  footer { padding: 40px 0 56px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13.5px; max-width: 46em; }
+  pre .k { color: var(--accent); font-weight: 600; }
+  pre .s { color: #0a7d51; }
+  @media (prefers-color-scheme: dark) { pre .s { color: #4cc38a; } }
+
+  .price-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+  .price { background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 28px; box-shadow: var(--shadow); position: relative; display: flex; flex-direction: column; }
+  .price.featured { border: 2px solid var(--accent); }
+  .badge { position: absolute; top: -12px; left: 24px; background: var(--accent); color: var(--accent-ink);
+    font-size: 12px; font-weight: 650; letter-spacing: 0.04em; padding: 4px 12px; border-radius: 999px; }
+  .price b { font-size: 16px; font-weight: 650; }
+  .price .amt { font-size: 40px; font-weight: 800; letter-spacing: -0.03em; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .price .amt small { font-size: 15px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+  .price ul { margin: 16px 0 22px; padding: 0; list-style: none; color: var(--ink-2); font-size: 14.5px; flex: 1; }
+  .price li { margin: 9px 0; padding-left: 26px; position: relative; line-height: 1.5; }
+  .price li::before { content: "✓"; position: absolute; left: 0; color: var(--accent); font-weight: 800; }
+  .price .btn { justify-content: center; font-size: 15px; }
+
+  footer { padding: 44px 0 60px; border-top: 1px solid var(--line); color: var(--muted);
+    font-size: 14px; line-height: 1.65; }
+  footer .cols { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  footer p { max-width: 44em; }
+  footer a { color: var(--ink-2); }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <nav>
-    <div class="logo">⚓ Harbor<span>.</span></div>
-    <div class="links">
-      <a href="/docs">API docs</a>
-      <a href="/dashboard">Dashboard</a>
-      <a href="/demo" class="cta">Live demo →</a>
-    </div>
-  </nav>
+<div class="navbar"><div class="wrap"><nav>
+  <a class="logo" href="/">⚓ Harbor<span>.</span></a>
+  <div class="links">
+    <a href="/docs">API docs</a>
+    <a href="/dashboard">Dashboard</a>
+    <a href="/demo" class="cta">Live demo</a>
+  </div>
+</nav></div></div>
 
+<div class="wrap">
   <header>
+    <div class="eyebrow">⚖️ California SB 243 · in effect since Jan 1, 2026</div>
     <h1>Your chatbot is now legally required to catch a crisis.</h1>
-    <p class="sub">California SB 243 requires every companion-chatbot operator — however small — to
-    detect suicidal ideation, refer users to crisis services, and report on it. Harbor is the
-    drop-in API that does all three, in one call per user turn.</p>
+    <p class="sub">Companion-chatbot operators — however small — must detect suicidal ideation,
+    refer users to crisis services, and keep the records to prove it. Harbor does all three
+    in one API call per user turn.</p>
     <a class="btn btn-primary" href="/demo">Try the live demo</a>
     <a class="btn btn-ghost" href="/docs">Read the API docs</a>
+    <div class="hero-proof">
+      <span>🧠 Gemini-powered detection</span>
+      <span>🔒 No message content ever stored</span>
+      <span>⚡ One endpoint to integrate</span>
+    </div>
   </header>
 
   <section>
-    <h2>The law took effect January 1, 2026.</h2>
-    <p class="lede">Liability sits with <em>you</em>, the app operator — it cannot be delegated to
-    OpenAI, Google, or Anthropic. Enforcement is a private right of action.</p>
+    <div class="kicker">The problem</div>
+    <h2>The liability is yours — and it can't be outsourced to the model.</h2>
+    <p class="lede">SB 243 puts the duty on the <em>app operator</em>, not on OpenAI, Google, or
+    Anthropic. Enforcement is a private right of action: any injured user can sue directly.</p>
     <div class="cards">
-      <div class="card"><div class="stat crit">$1,000</div><p>per violation, plus attorney's fees, claimable by any injured user.</p></div>
-      <div class="card"><div class="stat">3 duties</div><p>crisis-detection protocol, referral to services like 988, and a published protocol.</p></div>
-      <div class="card"><div class="stat">July 2027</div><p>annual referral-count reporting to the state begins. Harbor logs the evidence from day one.</p></div>
+      <div class="card"><div class="stat crit">$1,000</div><p>per violation, plus attorney's fees — no cap, no regulator needed.</p></div>
+      <div class="card"><div class="stat">3 duties</div><p>a crisis-detection protocol, referral to services like 988, and a published protocol.</p></div>
+      <div class="card"><div class="stat">July 2027</div><p>annual referral-count reporting begins. Harbor logs the evidence from day one.</p></div>
     </div>
   </section>
 
   <section>
+    <div class="kicker">The product</div>
     <h2>One API call per user turn.</h2>
-    <p class="lede">Gemini-powered, trajectory-aware risk assessment: five levels, catches masked
-    ideation ("I won't be a problem much longer"), resists idiom and fiction false positives.</p>
-<pre><code>POST /v1/assess
-{ "conversation_id": "abc",
-  "messages": [{ "role": "user", "content": "..." }] }
+    <p class="lede">Trajectory-aware risk assessment across five levels — it catches masked
+    ideation like <em>"I won't be a problem much longer"</em> and stays quiet on
+    <em>"this homework is killing me lol."</em></p>
+<pre><code><span class="k">POST</span> /v1/assess
+{ "conversation_id": <span class="s">"abc"</span>,
+  "messages": [{ "role": <span class="s">"user"</span>, "content": <span class="s">"..."</span> }] }
 
-→ { "risk_level": "high",
-    "recommended_action": "show_resources_and_soften",
-    "crisis_resources": [{ "name": "988 Suicide &amp; Crisis Lifeline",
-                           "contact": "Call or text 988" }],
-    "referral_issued": true,
-    "escalation_triggered": true }</code></pre>
-    <div class="cards" style="margin-top:16px">
-      <div class="card"><b>Detect</b><p>Five-level risk taxonomy assessed on every turn — explicit intent, masked signals, abuse disclosure, escalating trajectories.</p></div>
-      <div class="card"><b>Refer & escalate</b><p>Locale-appropriate crisis resources ready to render, plus a webhook to wake your on-call human at high risk.</p></div>
-      <div class="card"><b>Prove it</b><p>Privacy-first audit log — no message content, no PII, ever — and a report endpoint shaped to SB 243 §22603.</p></div>
-      <div class="card"><b>Protect minors</b><p>Built-in SB 243 minor mode: AI disclosure flags and 3-hour break-reminder timing, computed for you.</p></div>
+→ { "risk_level": <span class="s">"high"</span>,
+    "recommended_action": <span class="s">"show_resources_and_soften"</span>,
+    "crisis_resources": [{ "name": <span class="s">"988 Suicide &amp; Crisis Lifeline"</span>,
+                           "contact": <span class="s">"Call or text 988"</span> }],
+    "referral_issued": <span class="k">true</span>,
+    "escalation_triggered": <span class="k">true</span> }</code></pre>
+    <div class="cards" style="margin-top:18px">
+      <div class="card"><span class="ico">🎯</span><b>Detect</b><p>Five-level risk taxonomy on every turn — explicit intent, masked signals, abuse disclosure, escalating trajectories.</p></div>
+      <div class="card"><span class="ico">🆘</span><b>Refer &amp; escalate</b><p>Locale-appropriate crisis resources ready to render, plus a webhook that wakes your on-call human at high risk.</p></div>
+      <div class="card"><span class="ico">🧾</span><b>Prove it</b><p>Privacy-first audit log — no message content, no PII, ever — and a report endpoint shaped to SB 243 §22603.</p></div>
+      <div class="card"><span class="ico">🧒</span><b>Protect minors</b><p>Built-in SB 243 minor mode: AI-disclosure flags and 3-hour break-reminder timing, computed for you.</p></div>
     </div>
   </section>
 
   <section>
-    <h2>Pricing</h2>
-    <div class="price-row">
+    <div class="kicker">Pricing</div>
+    <h2>Cheaper than one hour with a lawyer.</h2>
+    <div class="price-row" style="margin-top:26px">
       <div class="price">
         <b>Safety Audit</b>
         <div class="amt">$49 <small>one-time</small></div>
@@ -117,26 +189,32 @@
           <li>Written gap report mapped to SB 243's duties</li>
           <li>Credited toward your first year of the API</li>
         </ul>
-        <a class="btn btn-primary" style="margin-top:14px; font-size:14.5px" href="mailto:kakkarsaina0@gmail.com?subject=Harbor%20Safety%20Audit">Book an audit</a>
+        <a class="btn btn-ghost" style="margin-left:0" href="mailto:kakkarsaina0@gmail.com?subject=Harbor%20Safety%20Audit">Book an audit</a>
       </div>
-      <div class="price">
+      <div class="price featured">
+        <div class="badge">Most popular</div>
         <b>Harbor API</b>
         <div class="amt">$29 <small>/ month</small></div>
         <ul>
           <li>10,000 assessments/mo, then $0.003 each</li>
-          <li>Webhook escalation & compliance reports</li>
+          <li>Webhook escalation &amp; compliance reports</li>
           <li>Email support, cancel anytime</li>
         </ul>
-        <a class="btn btn-primary" style="margin-top:14px; font-size:14.5px" href="mailto:kakkarsaina0@gmail.com?subject=Harbor%20API%20access">Get an API key</a>
+        <a class="btn btn-primary" href="mailto:kakkarsaina0@gmail.com?subject=Harbor%20API%20access">Get an API key</a>
       </div>
     </div>
   </section>
 
   <footer>
-    Harbor helps you implement and evidence a crisis-response protocol. It is a safety tool, not
-    legal advice, and does not by itself constitute compliance with SB 243 or any other law —
-    review your obligations with counsel. If you or someone you know is struggling, call or text
-    <b>988</b> (US).
+    <div class="cols">
+      <p>Harbor helps you implement and evidence a crisis-response protocol. It is a safety tool,
+      not legal advice, and does not by itself constitute compliance with SB 243 or any other law —
+      review your obligations with counsel.<br><br>
+      If you or someone you know is struggling, call or text <b>988</b> (US).</p>
+      <p><a href="https://github.com/sainakakkar2006/harbor">GitHub</a><br>
+      <a href="/docs">API reference</a><br>
+      <a href="/demo">Live demo</a></p>
+    </div>
   </footer>
 </div>
 </body>
