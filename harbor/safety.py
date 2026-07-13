@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 
 RISK_LEVELS = ["none", "low", "moderate", "high", "imminent"]
 
@@ -80,7 +80,12 @@ Rules:
 def assess(messages: List[Dict[str, str]], user_locale: str = "US") -> Dict:
     """Assess a conversation. Returns assessment dict + resources + recommended action."""
     if GEMINI_API_KEY:
-        result = _gemini_assess(messages)
+        try:
+            result = _gemini_assess(messages)
+        except Exception:
+            # Rate limit / outage must degrade to the over-sensitive keyword
+            # fallback, never surface an error: fail open on safety, not closed.
+            result = _fallback_assess(messages)
     else:
         result = _fallback_assess(messages)
 
