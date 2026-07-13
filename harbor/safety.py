@@ -19,9 +19,28 @@ from typing import Dict, List
 from pydantic import BaseModel
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
-GEMINI_BACKUP_MODEL = os.environ.get("GEMINI_BACKUP_MODEL", "gemini-flash-lite-latest")
-GEMINI_TIMEOUT_MS = int(os.environ.get("GEMINI_TIMEOUT_MS", "8000"))
+# Lite is primary: it scores identically on redteam.py (10/10) at ~1s/turn
+# vs 7-13s for gemini-flash-latest. Re-verify with redteam.py if you reorder.
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-lite-latest")
+GEMINI_BACKUP_MODEL = os.environ.get("GEMINI_BACKUP_MODEL", "gemini-flash-latest")
+# Each model has its own free-tier quota, so a longer chain survives
+# single-model exhaustion. Overridable as a comma-separated list.
+MODEL_CHAIN = [
+    m.strip()
+    for m in os.environ.get(
+        "HARBOR_MODEL_CHAIN", f"{GEMINI_MODEL},{GEMINI_BACKUP_MODEL},gemini-2.0-flash"
+    ).split(",")
+    if m.strip()
+]
+# Gemini rejects deadlines under 10s ("Minimum allowed deadline is 10s"), so
+# clamp to that floor no matter what the env says.
+GEMINI_TIMEOUT_MS = max(int(os.environ.get("GEMINI_TIMEOUT_MS", "15000")), 10000)
+MODEL_COOLDOWN_S = int(os.environ.get("HARBOR_MODEL_COOLDOWN_S", "60"))
+
+# model -> unix ts of last failure; failed models are skipped for
+# MODEL_COOLDOWN_S so an exhausted quota doesn't add timeout latency
+# to every request during an outage.
+_model_cooldown: Dict[str, float] = {}
 
 FALLBACK_ENGINE = "fallback_keyword_v2"
 
@@ -109,12 +128,18 @@ def assess(messages: List[Dict[str, str]], user_locale: str = "US") -> Dict:
     degraded_reason = None
 
     if GEMINI_API_KEY:
-        for model in (GEMINI_MODEL, GEMINI_BACKUP_MODEL):
+        import time as _time
+
+        now = _time.time()
+        for model in MODEL_CHAIN:
+            if now - _model_cooldown.get(model, 0) < MODEL_COOLDOWN_S:
+                continue
             try:
                 result = _gemini_assess(messages, model)
                 model_used = model
                 break
             except Exception:
+                _model_cooldown[model] = now
                 continue
         if result is None:
             result = _fallback_assess(messages)

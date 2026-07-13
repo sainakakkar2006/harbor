@@ -21,6 +21,7 @@ def clean_state():
     if os.path.exists("/tmp/harbor_test.db"):
         os.remove("/tmp/harbor_test.db")
     main._demo_hits.clear()
+    safety._model_cooldown.clear()
     yield
 
 
