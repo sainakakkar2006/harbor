@@ -13,7 +13,7 @@ Most small AI apps have nothing in place. Harbor is one API call per user turn.
 
 | Surface | Path |
 |---|---|
-| Landing page | `GET /` |
+| Landing page ($49 audit / $29 mo API) | `GET /` |
 | Live demo playground | `GET /demo` |
 | Compliance dashboard | `GET /dashboard` |
 | API docs (auto) | `GET /docs` |
