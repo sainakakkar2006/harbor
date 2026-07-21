@@ -203,7 +203,7 @@ harbor/
   escalation.py    webhook escalation at high/imminent risk
 site/              landing page, demo playground, dashboard (static)
 redteam.py         crisis-scenario eval suite
-tests/             13 tests, including a mocked Gemini path
+tests/             22 tests, including a mocked Gemini path
 Dockerfile         container build
 render.yaml        free-tier Render blueprint
 ```
@@ -211,7 +211,7 @@ render.yaml        free-tier Render blueprint
 ## Test & Evaluate
 
 ```bash
-.venv/bin/python -m pytest tests/   # 13 tests incl. mocked Gemini path
+.venv/bin/python -m pytest tests/   # 22 tests incl. mocked Gemini path
 .venv/bin/python redteam.py         # crisis-scenario eval suite (needs GEMINI_API_KEY)
 ```
 
