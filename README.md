@@ -8,12 +8,12 @@
   <a href="#"><img alt="FastAPI" src="https://img.shields.io/badge/fastapi-0.1x-009688?logo=fastapi&logoColor=white"></a>
   <a href="#"><img alt="Gemini" src="https://img.shields.io/badge/gemini-flash-4285F4?logo=googlegemini&logoColor=white"></a>
   <a href="#"><img alt="SQLite" src="https://img.shields.io/badge/sqlite-audit%20log-003B57?logo=sqlite&logoColor=white"></a>
-  <a href="#"><img alt="Cloud Run" src="https://img.shields.io/badge/cloud%20run-deployable-4285F4?logo=googlecloud&logoColor=white"></a>
-  <a href="#"><img alt="Pytest" src="https://img.shields.io/badge/pytest-13%20tests-0A9EDC?logo=pytest&logoColor=white"></a>
+  <a href="#"><img alt="Docker" src="https://img.shields.io/badge/docker-%230db7ed.svg?&style=flat&logo=docker&logoColor=white"></a>
+  <a href="#"><img alt="Pytest" src="https://img.shields.io/badge/pytest-%23C21325.svg?&style=flat&logo=pytest&logoColor=white"></a>
   <!-- BADGES:END -->
 </p>
 
-# ⚓ Harbor
+# harbor
 
 Author: Saina Kakkar
 
@@ -37,18 +37,49 @@ Harbor is one API call per user turn.
 | Live demo playground | `GET /demo` |
 | Compliance dashboard | `GET /dashboard` |
 | API docs (auto) | `GET /docs` |
+| Health check | `GET /health` |
 | Assess a turn | `POST /v1/assess` |
 | SB 243 report | `GET /v1/compliance/report?year=2026` |
 | Ops stats | `GET /v1/stats?days=14` |
 
-You send the conversation to `POST /v1/assess` and get back a five-level
-`risk_level`, a `recommended_action`, locale-appropriate `crisis_resources`,
-`referral_issued`, and `escalation_triggered` (this fires your webhook at
-high/imminent risk, with metadata only, never message content). There is
-also an optional `minor_protections` block covering the SB 243 AI disclosure
-and the 3-hour break-reminder timing. The risk level comes from Gemini
-structured output. It is trajectory-aware, so a joke like "this homework is
-killing me" does not trigger a referral.
+## The Assess Endpoint
+
+You send the conversation and some session context:
+
+```bash
+curl -X POST http://localhost:8000/v1/assess \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: sk_live_x" \
+  -d '{
+    "conversation_id": "conv_123",
+    "messages": [
+      {"role": "user", "content": "..."},
+      {"role": "assistant", "content": "..."}
+    ],
+    "user_locale": "US",
+    "user_is_minor": false
+  }'
+```
+
+The request also accepts `session_started_at` and `last_break_reminder_at`
+(unix timestamps, used for the minor break-reminder timing) and an
+`escalation_webhook` that overrides the server-wide one per call.
+
+You get back:
+
+- `risk_level`: one of `none`, `low`, `moderate`, `high`, `imminent`. This
+  comes from Gemini structured output and it is trajectory-aware, meaning it
+  looks at where the conversation is going, not one message in isolation. A
+  joke like "this homework is killing me" does not trigger a referral.
+- `recommended_action` and locale-appropriate `crisis_resources`
+- `referral_issued`: at moderate risk and above, the user is shown crisis
+  service referrals, and this flag records that for the compliance report
+- `escalation_triggered`: at `high` or `imminent`, Harbor fires your webhook
+  with metadata only, never message content
+- `minor_protections` (when `user_is_minor` is true): the SB 243 §22602 AI
+  disclosure requirement, plus `break_reminder_due` computed from the
+  3-hour timer, with ready-to-show reminder text
+- `model`, `degraded`, `tenant`: what actually ran, explained below
 
 ## Architecture
 
@@ -87,14 +118,24 @@ apps that use it.
    .venv/bin/uvicorn main:app --reload   # http://localhost:8000
    ```
 
-All config is optional: `GEMINI_MODEL` (default `gemini-flash-latest`),
-`GEMINI_BACKUP_MODEL` (default `gemini-flash-lite-latest`, tried when the
-primary fails), `GEMINI_TIMEOUT_MS` (default 8000),
-`HARBOR_API_KEYS="acme:sk_live_x,beta:sk_live_y"` (unset = open dev mode),
-`HARBOR_FAIL_MODE` (`closed` default / `open`), `HARBOR_MONTHLY_CAP` (default
-10000/tenant), `HARBOR_DEMO_RPH` (demo rate limit, default 30/hour/IP),
-`HARBOR_ALLOW_DEMO` (`0` disables keyless demo traffic),
-`HARBOR_ESCALATION_WEBHOOK`, `HARBOR_DB`, `HARBOR_HASH_SALT`.
+## Configuration Reference
+
+Everything is optional and set through environment variables:
+
+| Variable | Default | What it controls |
+|---|---|---|
+| `GEMINI_API_KEY` | unset | Enables model-based assessment; keyword fallback without it |
+| `GEMINI_MODEL` | `gemini-flash-latest` | Primary assessment model |
+| `GEMINI_BACKUP_MODEL` | `gemini-flash-lite-latest` | Tried when the primary fails |
+| `GEMINI_TIMEOUT_MS` | `8000` | Per-request model deadline |
+| `HARBOR_API_KEYS` | unset | `"acme:sk_live_x,beta:sk_live_y"`; unset = open dev mode |
+| `HARBOR_FAIL_MODE` | `closed` | `closed` returns 503 on blind outages, `open` returns degraded 200 |
+| `HARBOR_MONTHLY_CAP` | `10000` | Assessments per tenant per month |
+| `HARBOR_DEMO_RPH` | `30` | Demo rate limit per hour per IP |
+| `HARBOR_ALLOW_DEMO` | `1` | `0` disables keyless demo traffic entirely |
+| `HARBOR_ESCALATION_WEBHOOK` | unset | Called at high/imminent risk (metadata only) |
+| `HARBOR_DB` | local file | SQLite path for the audit log |
+| `HARBOR_HASH_SALT` | unset | Salt for conversation hashes |
 
 ## What Happens When the Model Is Down
 
@@ -152,6 +193,21 @@ Every event is recorded under the calling API key's label. `/v1/stats` and
 requests land in a shared, rate-limited `demo` tenant (the public demo page)
 that never mixes with paying tenants' compliance evidence.
 
+## Project Layout
+
+```
+main.py            FastAPI app: endpoints, auth, rate limits, minor protections
+harbor/
+  safety.py        risk assessment (Gemini structured output + keyword fallback)
+  store.py         SQLite audit log, stats, SB 243 report generation
+  escalation.py    webhook escalation at high/imminent risk
+site/              landing page, demo playground, dashboard (static)
+redteam.py         crisis-scenario eval suite
+tests/             13 tests, including a mocked Gemini path
+Dockerfile         container build
+render.yaml        free-tier Render blueprint
+```
+
 ## Test & Evaluate
 
 ```bash
@@ -168,7 +224,8 @@ gcloud run deploy harbor --source . --region us-central1 --allow-unauthenticated
 
 Note: Cloud Run's filesystem is ephemeral. For production, point `HARBOR_DB`
 at a mounted volume or swap `store.py` to Cloud SQL before relying on the
-audit log across restarts.
+audit log across restarts. There is also a `render.yaml` for a free-tier
+Render deploy.
 
 ## Disclaimer
 
