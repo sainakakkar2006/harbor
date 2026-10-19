@@ -4,6 +4,7 @@
 
 <p align="center">
   <!-- BADGES:START -->
+  <a href="https://github.com/sainakakkar2006/harbor/actions/workflows/tests.yml"><img alt="tests" src="https://github.com/sainakakkar2006/harbor/actions/workflows/tests.yml/badge.svg"></a>
   <a href="#"><img alt="Python" src="https://img.shields.io/badge/python-3.11-yellow"></a>
   <a href="#"><img alt="FastAPI" src="https://img.shields.io/badge/fastapi-0.1x-009688?logo=fastapi&logoColor=white"></a>
   <a href="#"><img alt="Gemini" src="https://img.shields.io/badge/gemini-flash-4285F4?logo=googlegemini&logoColor=white"></a>
@@ -208,7 +209,7 @@ Dockerfile         container build
 render.yaml        free-tier Render blueprint
 ```
 
-## Test & Evaluate
+## Verify
 
 ```bash
 .venv/bin/python -m pytest tests/   # 22 tests incl. mocked Gemini path
