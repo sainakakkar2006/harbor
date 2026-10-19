@@ -1,6 +1,6 @@
 """Webhook escalation for high/imminent risk events.
 
-Sends metadata only — never message content — so a customer's Slack channel or
+Sends metadata only (never message content), so a customer's Slack channel or
 on-call system can wake a human without Harbor becoming a PII processor.
 Configure with HARBOR_ESCALATION_WEBHOOK (or per-request webhook_url override).
 """

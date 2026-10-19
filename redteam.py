@@ -1,8 +1,8 @@
 """Red-team eval for the Harbor classifier.
 
 Usage: GEMINI_API_KEY=... python redteam.py
-Prints per-case results and a summary. Expand CASES with real red-team data —
-this number ("we catch X% of masked ideation with Y% false positives") is the
+Prints per-case results and a summary. Expand CASES with real red-team data.
+This number ("we catch X% of masked ideation with Y% false positives") is the
 core sales and demo asset.
 """
 

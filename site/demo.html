@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Harbor — Live demo</title>
+<title>Harbor: Live demo</title>
 <meta name="description" content="Type as a user of an AI companion app and watch Harbor's crisis detection respond in real time.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚓</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -88,7 +88,7 @@
   </nav>
   <h1>Live demo</h1>
   <p class="sub">Chat on the left as if you were a user of any AI companion app. Every turn is sent to
-  <code>POST /v1/assess</code> — the panel on the right is Harbor's real-time response.</p>
+  <code>POST /v1/assess</code>. The panel on the right is Harbor's real-time response.</p>
 
   <div class="scenarios">
     <button data-s="benign">😊 Benign chat</button>
@@ -108,7 +108,7 @@
       </form>
     </div>
     <div class="panel">
-      <h3>Harbor assessment — live</h3>
+      <h3>Harbor assessment (live)</h3>
       <div class="assess-body" id="assess"><div class="empty">No assessment yet.</div></div>
     </div>
   </div>
@@ -122,7 +122,7 @@ const SCENARIOS = {
   masked: ["everyone would be happier without me around", "i won't be a problem much longer anyway"],
   crisis: ["i can't do this anymore. i want to kill myself"],
 };
-const CANNED = "I hear you. I'm here to chat — tell me more?";
+const CANNED = "I hear you. I'm here to chat. Tell me more?";
 let messages = [];
 const chat = document.getElementById("chat");
 const assessEl = document.getElementById("assess");
@@ -150,9 +150,9 @@ async function sendTurn(text) {
       const body = await r.json().catch(() => ({}));
       const d = body.detail || {};
       if (r.status === 503) {
-        addMsg("system", "⚠️ 503 detection_unavailable — models unreachable; the keyword screen can't clear this message, so Harbor refuses to say \"no risk\". Integrators retry or queue (fail-closed contract).");
+        addMsg("system", "⚠️ 503 detection_unavailable: models unreachable; the keyword screen can't clear this message, so Harbor refuses to say \"no risk\". Integrators retry or queue (fail-closed contract).");
       } else if (r.status === 429) {
-        addMsg("system", "⚠️ 429 — demo rate limit reached (" + (d.limit_per_hour || 30) + "/hour per IP). Production traffic uses an API key.");
+        addMsg("system", "⚠️ 429: demo rate limit reached (" + (d.limit_per_hour || 30) + "/hour per IP). Production traffic uses an API key.");
       } else {
         addMsg("system", "API error " + r.status);
       }
@@ -163,7 +163,7 @@ async function sendTurn(text) {
     render(a);
     if (a.referral_issued) {
       const res = a.crisis_resources[0];
-      addMsg("system", "⚓ Harbor interrupted the reply and surfaced: " + (res ? res.name + " — " + res.contact : "crisis resources"));
+      addMsg("system", "⚓ Harbor interrupted the reply and surfaced: " + (res ? res.name + ", " + res.contact : "crisis resources"));
     } else {
       addMsg("assistant", CANNED);
       messages.push({ role: "assistant", content: CANNED });
@@ -189,7 +189,7 @@ function render(a) {
       <dt>Categories</dt><dd>${cats}</dd>
       <dt>Rationale</dt><dd>${a.rationale}</dd>
       <dt>Referral issued / escalation</dt>
-      <dd>${a.referral_issued ? "✅ yes" : "—"} / ${a.escalation_triggered ? "🔔 webhook fired" : "—"}</dd>
+      <dd>${a.referral_issued ? "✅ yes" : "-"} / ${a.escalation_triggered ? "🔔 webhook fired" : "-"}</dd>
       ${resources ? "<dt>Crisis resources returned</dt><dd>" + resources + "</dd>" : ""}
       <dt>Latency · engine</dt><dd>${a.latency_ms} ms · ${a.model}${a.degraded ? " · ⚠️ degraded (keyword screen, not a model)" : ""}</dd>
     </dl>

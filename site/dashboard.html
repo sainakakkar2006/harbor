@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Harbor — Compliance dashboard</title>
+<title>Harbor: Compliance dashboard</title>
 <meta name="description" content="Live compliance evidence: assessments, crisis referrals, and the SB 243 annual report preview.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚓</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -69,7 +69,7 @@
     <div><a href="/docs">API docs</a><a href="/demo">Live demo</a></div>
   </nav>
   <h1>Compliance dashboard</h1>
-  <p class="sub">Last 14 days of assessments for your tenant — this public view shows the shared
+  <p class="sub">Last 14 days of assessments for your tenant. This public view shows the shared
   <b>demo sandbox</b>. Paying tenants fetch the same endpoints with their API key and see only
   their own data. No message content or user identifiers are ever stored.</p>
 
@@ -89,7 +89,7 @@
 
   <div class="panel">
     <h3>SB 243 annual report preview (2026)</h3>
-    <div class="note">The exact aggregates §22603 asks for — exportable, PII-free.</div>
+    <div class="note">The exact aggregates §22603 asks for. Exportable and PII-free.</div>
     <div id="report"></div>
   </div>
 </div>
@@ -112,13 +112,13 @@ async function load() {
 
   const daily = stats.daily;
   if (!daily.length) {
-    document.getElementById("daily").innerHTML = '<div class="empty">No events yet — send traffic to /v1/assess or try the <a href="/demo">demo</a>.</div>';
+    document.getElementById("daily").innerHTML = '<div class="empty">No events yet. Send traffic to /v1/assess or try the <a href="/demo">demo</a>.</div>';
   } else {
     const max = Math.max(...daily.map(d => d.assessments));
     document.getElementById("daily").innerHTML =
       '<div class="chart">' + daily.map(d =>
         `<div class="bar" style="height:${Math.max(4, d.assessments / max * 100)}%">
-           <div class="tip">${d.date} — ${d.assessments} assessed, ${d.referrals || 0} referred</div>
+           <div class="tip">${d.date}, ${d.assessments} assessed, ${d.referrals || 0} referred</div>
          </div>`).join("") + "</div>" +
       '<div class="xlabels">' + daily.map(d => `<div>${d.date.slice(5)}</div>`).join("") + "</div>";
   }

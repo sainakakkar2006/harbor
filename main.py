@@ -1,4 +1,4 @@
-"""Harbor — drop-in safety & compliance layer for AI chat apps (SB 243 et al.).
+"""Harbor: drop-in safety & compliance layer for AI chat apps (SB 243 et al.).
 
 Run:   uvicorn main:app --reload
 Auth:  HARBOR_API_KEYS="label1:key1,label2:key2". Requests without a valid key
@@ -9,11 +9,11 @@ Env:   GEMINI_API_KEY, GEMINI_MODEL, GEMINI_BACKUP_MODEL, GEMINI_TIMEOUT_MS,
        HARBOR_ESCALATION_WEBHOOK, HARBOR_DB, HARBOR_HASH_SALT.
 
 Error contract (see README):
-  200 — assessment completed; check `degraded` (true = keyword screen, not a model)
-  401 — HARBOR_API_KEYS is set, a key was supplied, and it is invalid
-  422 — malformed request body
-  429 — demo rate limit or tenant monthly cap exceeded
-  503 — detection degraded AND no risk detected (fail-closed default): retry or queue
+  200: assessment completed; check `degraded` (true = keyword screen, not a model)
+  401: HARBOR_API_KEYS is set, a key was supplied, and it is invalid
+  422: malformed request body
+  429: demo rate limit or tenant monthly cap exceeded
+  503: detection degraded AND no risk detected (fail-closed default): retry or queue
 """
 
 import os
@@ -33,8 +33,8 @@ DESCRIPTION = """Crisis-detection, referral, and compliance-evidence API for AI 
 Send each user turn to **POST /v1/assess**; render `crisis_resources` when
 `referral_issued` is true. Responses marked `degraded: true` were screened by
 the conservative keyword fallback, not a Gemini model. By default a degraded
-assessment that finds no risk returns **503** rather than a false "none" —
-retry with backoff or queue the turn.
+assessment that finds no risk returns **503** rather than a false "none".
+Retry with backoff or queue the turn.
 """
 
 app = FastAPI(
@@ -62,7 +62,7 @@ def _tenant(x_api_key: Optional[str], request: Optional[Request] = None) -> str:
     """Resolve the tenant label for this request.
 
     Valid key → that tenant. No key (or no keys configured) → "demo" / "dev".
-    A *wrong* key is always a 401 — never silently downgraded to demo.
+    A *wrong* key is always a 401, never silently downgraded to demo.
     """
     raw = os.environ.get("HARBOR_API_KEYS", "")
     if not raw:
@@ -132,7 +132,7 @@ def assess(
 
     Returns risk level, recommended action, crisis resources (when a referral
     is due), and honest engine/degradation metadata. 503 = detection is
-    degraded and nothing conclusive was found — retry or queue, do not treat
+    degraded and nothing conclusive was found: retry or queue, do not treat
     as "no risk".
     """
     label = _tenant(x_api_key, request)
@@ -150,7 +150,7 @@ def assess(
     latency_ms = int((time.time() - t0) * 1000)
 
     # Fail closed: a degraded scan that found nothing is NOT evidence of safety.
-    # (Degraded scans that DO find risk are returned — catching beats erroring.)
+    # (Degraded scans that DO find risk are returned. Catching beats erroring.)
     if (
         result["degraded"]
         and result["degraded_reason"] == "model_error"
@@ -187,7 +187,7 @@ def assess(
 def report(year: int = 2026, x_api_key: Optional[str] = Header(default=None)) -> Dict:
     """SB 243 §22603-shaped annual aggregates, scoped to the calling tenant.
 
-    Without an API key this returns the shared demo sandbox — never another
+    Without an API key this returns the shared demo sandbox, never another
     tenant's data.
     """
     label = _tenant(x_api_key)

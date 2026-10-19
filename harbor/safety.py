@@ -6,7 +6,7 @@ moderation. Precision on imminent-risk matters more than breadth.
 
 Degradation contract (see README): the primary model is tried first, then a
 backup model. If both fail, the keyword screen runs and the result is marked
-degraded=True with model="fallback_keyword_v2" — the response never claims a
+degraded=True with model="fallback_keyword_v2". The response never claims a
 Gemini model assessed a message it didn't. Whether a degraded no-risk result
 becomes a 503 is the API layer's decision (HARBOR_FAIL_MODE).
 """
@@ -80,7 +80,7 @@ CRISIS_RESOURCES = {
         {"name": "Teléfono de la Esperanza / Línea 024", "contact": "Llama al 024", "url": "https://www.sanidad.gob.es/linea024/home.htm"},
     ],
     "DEFAULT": [
-        {"name": "International Association for Suicide Prevention — Crisis Centres", "contact": "", "url": "https://www.iasp.info/resources/Crisis_Centres/"},
+        {"name": "International Association for Suicide Prevention: Crisis Centres", "contact": "", "url": "https://www.iasp.info/resources/Crisis_Centres/"},
     ],
 }
 
@@ -92,7 +92,7 @@ class Assessment(BaseModel):
     confidence: float  # 0–1
 
 
-_SYSTEM = f"""You are a safety classifier for an AI chat application. You assess the USER's messages (not the assistant's) for signals that require a duty-of-care response under California SB 243 and similar laws. Users may write in any language — assess meaning, not language.
+_SYSTEM = f"""You are a safety classifier for an AI chat application. You assess the USER's messages (not the assistant's) for signals that require a duty-of-care response under California SB 243 and similar laws. Users may write in any language, assess meaning, not language.
 
 Risk levels (pick exactly one):
 - none: no distress signals
@@ -108,7 +108,7 @@ Rules:
 - Indirect and masked expressions count ("I won't be a problem much longer"), as do
   abbreviations and euphemisms in any language ("kms", "unalive").
 - Do NOT flag: idioms ("this traffic is killing me"), fiction/roleplay clearly framed as such, academic discussion of these topics, song lyrics.
-- rationale: one sentence, describe the signal type — never quote the user's words back.
+- rationale: one sentence, describe the signal type, never quote the user's words back.
 - When genuinely uncertain between two levels, pick the higher one.
 """
 
@@ -118,9 +118,9 @@ def assess(messages: List[Dict[str, str]], user_locale: str = "US") -> Dict:
 
     Returns the assessment plus resources, recommended action, and an honest
     account of which engine produced it:
-      model     — engine that actually ran (never a Gemini name unless Gemini ran)
-      degraded  — True when the keyword screen answered instead of a model
-      degraded_reason — "model_error" (key set, calls failed) or
+      model    : engine that actually ran (never a Gemini name unless Gemini ran)
+      degraded : True when the keyword screen answered instead of a model
+      degraded_reason: "model_error" (key set, calls failed) or
                         "no_model_configured" (no GEMINI_API_KEY)
     """
     result = None
@@ -193,13 +193,13 @@ def _gemini_assess(messages: List[Dict[str, str]], model: str) -> Assessment:
 # Degraded keyword screen (v2). This is a safety net, not a classifier: it is
 # deliberately over-sensitive, covers common abbreviations/euphemisms, Spanish,
 # and means+finality phrasing. It exists so an outage degrades to "too careful"
-# instead of "silent none" — the API layer still surfaces degraded=True and,
+# instead of "silent none". The API layer still surfaces degraded=True and,
 # for no-risk results, fails closed by default.
 # ---------------------------------------------------------------------------
 
 _EXPLICIT_RE = re.compile(
     r"\b("
-    # English — explicit and common shorthand
+    # English, explicit and common shorthand
     r"kill(ing)? myself|kms|unalive( myself)?|suicid(e|al)|end(ing)? my life|"
     r"end it all|take my own life|want(s|ed)? to die|wanna die|"
     r"wish i (was|were) dead|better off dead|no reason to live|"
@@ -207,7 +207,7 @@ _EXPLICIT_RE = re.compile(
     r"hurt(ing)? myself|cut(ting)? myself|self.?harm|"
     r"won'?t be (around|a problem|here) (much longer|anymore)|"
     r"not be here tomorrow|goodbye forever|"
-    # Spanish — explicit
+    # Spanish, explicit
     r"quitar(me|se) la vida|no quiero (vivir|seguir viviendo)|"
     r"matar(me|se)|suicidar(me|se)|acabar con mi vida|quiero morir(me)?"
     r")\b",

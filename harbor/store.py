@@ -2,7 +2,7 @@
 
 SB 243's annual report (§22603, due July 1, 2027) must contain referral counts
 and protocol descriptions and must NOT contain user identifiers or personal
-information. So we never store message content — only a salted hash of the
+information. So we never store message content, only a salted hash of the
 conversation id and the assessment metadata. That is also the sales pitch:
 customers get compliance evidence without a new PII liability.
 """
